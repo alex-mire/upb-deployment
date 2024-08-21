@@ -1,0 +1,25 @@
+version: "3.8"
+services:
+  # Backing Services
+  authorization-service-db:
+    image: "postgres:14.12"
+    container_name: "authorization-service-db"
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=authorization-service-db
+    volumes:
+      - ./database_inits/authorization-service-db.sql:/docker-entrypoint-initdb.d/init-1-authorization-service-db.sql
+  payment-service-db:
+    image: "postgres:14.12"
+    container_name: "payment-service-db"
+    ports:
+      - 5433:5432
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=payment-service-db
+    volumes:
+      - ./database_inits/payment-service-db.sql:/docker-entrypoint-initdb.d/init-2-payment-service-db.sql
