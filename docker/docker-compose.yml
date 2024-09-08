@@ -1,11 +1,12 @@
 version: "3.8"
 services:
-  # Backing Services
   authorization-service-db:
     image: "postgres:14.12"
+    networks:
+      - upb
     container_name: "authorization-service-db"
     ports:
-      - 5432:5432
+      - "5432:5432"
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
@@ -14,12 +15,91 @@ services:
       - ./database_inits/authorization-service-db.sql:/docker-entrypoint-initdb.d/init-1-authorization-service-db.sql
   payment-service-db:
     image: "postgres:14.12"
+    networks:
+      - upb
     container_name: "payment-service-db"
     ports:
-      - 5433:5432
+      - "5433:5432"
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=payment-service-db
     volumes:
       - ./database_inits/payment-service-db.sql:/docker-entrypoint-initdb.d/init-2-payment-service-db.sql
+  upb-redis:
+    networks:
+      - upb
+    image: redis:alpine
+    container_name: "upb-redis"
+    ports:
+    - "6379:6379"
+  mail:
+    networks:
+      - upb
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+#  config-service:
+#    networks:
+#      - upb
+#    image: "config-service"
+#    container_name: "config_service"
+#    platform: linux/amd64
+#    ports:
+#      - "9000:9000"
+  authorization-server:
+    depends_on:
+      - authorization-service-db
+    networks:
+      - upb
+    image: "authorization-server"
+    container_name: "authorization-server"
+    ports:
+      - "8080:8080"
+    environment:
+      - DATA_SOURCE_URL=jdbc:postgresql://authorization-service-db:5432/authorization-service-db
+      - DATA_SOURCE_USERNAME=user
+      - DATA_SOURCE_PASSWORD=password
+      - MAIL_URL=mail
+      - MAIL_PORT=1025
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=password
+      - PAYMENT_SERVICE_URL=payment-service:9090
+  payment-service:
+    depends_on:
+      - payment-service-db
+    networks:
+      - upb
+    image: "payment-service"
+    container_name: "payment-service"
+    platform: linux/amd64
+    ports:
+      - "9090:9090"
+    environment:
+      - DATA_SOURCE_URL=jdbc:postgresql://payment-service-db:5432/payment-service-db
+      - DATA_SOURCE_USERNAME=user
+      - DATA_SOURCE_PASWORD=password
+      - CONFIG_URL=http://config-service:9000
+      - KEY_SET_URI=http://authorization-server:8080
+  gateway-service:
+    depends_on:
+      - upb-redis
+      - authorization-server
+    networks:
+      - upb
+    image: "gateway-service"
+    container_name: "gateway-service"
+    ports:
+      - "7070:7070"
+    environment:
+      - CLIENT_REDIRECT_URI=http://localhost:7070
+      - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_MY_AUTHORIZATION_SERVER_ISSUER_URI=http://host.docker.internal:8085/as
+      - AUTHORIZATION_SERVER_URL=http://authorization-server:8080
+      - PAYMENT_SERVICE_URL=http://payment-service:9090
+      - SPRING_DATA_REDIS_HOST=upb-redis
+      - SPRING_DATA_REDIS_PORT=6379
+
+networks:
+  upb:
+    driver: bridge

@@ -1,1 +1,1 @@
-create schema if not exists authorization_service;
+create schema if not exists public;
